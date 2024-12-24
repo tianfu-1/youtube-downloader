@@ -17,7 +17,33 @@ import zipfile
 import tempfile
 import shutil
 
+# 修改路径配置
+BASE_DIR = Path("/tmp")  # 使用 /tmp 目录
+STATIC_DIR = BASE_DIR / "static"
+VIDEOS_DIR = STATIC_DIR / "videos"
+DOWNLOADS_DIR = STATIC_DIR / "downloads"
+
+# 确保目录存在
+STATIC_DIR.mkdir(parents=True, exist_ok=True)
+VIDEOS_DIR.mkdir(parents=True, exist_ok=True)
+DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)
+
+# 修改 FastAPI 应用配置
 app = FastAPI()
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+# 添加健康检查路由
+@app.get("/health")
+async def health_check():
+    return {"status": "ok"}
+
+# 修改元数据文件路径
+METADATA_FILE = BASE_DIR / "videos_metadata.json"
+
+# 确保元数据文件存在
+if not METADATA_FILE.exists():
+    with open(METADATA_FILE, "w") as f:
+        json.dump({}, f)
 
 # WebSocket连接管理
 class ConnectionManager:
@@ -55,18 +81,8 @@ async def websocket_endpoint(websocket: WebSocket):
         print(f"WebSocket错误: {str(e)}")
         manager.disconnect(websocket)
 
-# 创建必要的目录
-STATIC_DIR = Path("static")
-VIDEOS_DIR = Path("static/videos")
-STATIC_DIR.mkdir(exist_ok=True)
-VIDEOS_DIR.mkdir(parents=True, exist_ok=True)
-
 # 视频信息缓存
 VIDEO_INFO_CACHE = {}
-METADATA_FILE = "videos_metadata.json"
-
-# 挂载静态文件
-app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # 初始化模板系统
 templates = Jinja2Templates(directory="templates")
@@ -111,7 +127,7 @@ def progress_hook(d):
             'eta': d.get('eta', 0),
         }
 
-# YouTube可访问性检查
+# YouTube���访问性检查
 async def check_youtube_access() -> tuple[bool, Optional[str]]:
     test_url = "https://www.youtube.com/favicon.ico"
     timeout = aiohttp.ClientTimeout(total=30)
@@ -442,7 +458,7 @@ async def get_channel_info(request: Request):
                         
                         print(f"处理视频: {video_url}")
                         
-                        # 获取详细视频信息
+                        # ���取详细视频信息
                         video_opts = {
                             'quiet': True,
                             'no_warnings': True,
@@ -534,10 +550,6 @@ async def get_channel_info(request: Request):
 # 修改广播函数
 async def broadcast_progress(message: dict):
     await manager.broadcast(message)
-
-# 添加新的常量定义
-DOWNLOADS_DIR = Path("static/downloads")
-DOWNLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
 @app.post("/download-all")
 async def download_all_videos():
