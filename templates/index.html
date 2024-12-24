@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Video Downloader</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50">
+    <!-- 在body开始处添加进度显示 -->
+    <div id="progress" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center">
+        <div class="bg-white p-6 rounded-lg shadow-lg w-96">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
+            <p id="progressText" class="mt-2 text-center">处理中...</p>
+            <div id="progressDetails" class="mt-2 text-sm text-gray-600">
+                <p id="currentVideo" class="text-center"></p>
+                <p id="progressStats" class="text-center"></p>
+            </div>
+        </div>
+    </div>
+
+    <div class="container mx-auto px-4 py-8">
+        <!-- 标题部分 -->
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">YouTube Video Downloader</h1>
+            <p class="text-gray-600">输入YouTube视频链接开始下载</p>
+        </div>
+
+        <!-- 下载方式选择 -->
+        <div class="max-w-2xl mx-auto mb-4">
+            <div class="flex gap-4 justify-center mb-4">
+                <button onclick="switchMode('single')" 
+                        id="singleModeBtn"
+                        class="px-4 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    单个视频
+                </button>
+                <button onclick="switchMode('batch')"
+                        id="batchModeBtn"
+                        class="px-4 py-2 rounded-lg bg-gray-500 text-white hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                    批量下载
+                </button>
+                <button onclick="switchMode('channel')"
+                        id="channelModeBtn"
+                        class="px-4 py-2 rounded-lg bg-gray-500 text-white hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                    下载用户视频
+                </button>
+            </div>
+        </div>
+
+        <!-- 单个视频输入表单 -->
+        <div id="singleMode" class="max-w-2xl mx-auto mb-8">
+            <form id="downloadForm" class="flex gap-4">
+                <input type="text" 
+                       name="url" 
+                       placeholder="输入YouTube视频链接" 
+                       class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <button type="submit" 
+                        class="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    获取信息
+                </button>
+            </form>
+        </div>
+
+        <!-- 批量下载表单 -->
+        <div id="batchMode" class="max-w-2xl mx-auto mb-8 hidden">
+            <form id="batchForm" class="space-y-4">
+                <textarea name="urls" 
+                          rows="5" 
+                          placeholder="输入多个YouTube视频链接，每行一个"
+                          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                <button type="submit" 
+                        class="w-full px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    批量获取信息
+                </button>
+            </form>
+        </div>
+
+        <!-- 用户视频下载表单 -->
+        <div id="channelMode" class="max-w-2xl mx-auto mb-8 hidden">
+            <form id="channelForm" class="flex gap-4">
+                <input type="text" 
+                       name="channel_url" 
+                       placeholder="输入YouTube用户/频道链接" 
+                       class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <button type="submit" 
+                        class="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    获取用户视频
+                </button>
+            </form>
+        </div>
+
+        <!-- 视频列表 -->
+        <div class="max-w-6xl mx-auto mb-4">
+            <div class="flex justify-end gap-4">
+                <button onclick="downloadAllVideos()" 
+                        id="downloadAllBtn"
+                        class="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500">
+                    下载全部视频
+                </button>
+            </div>
+        </div>
+
+        <!-- 添加打包进度提示 -->
+        <div id="zipProgress" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+            <div class="bg-white p-6 rounded-lg shadow-lg w-96">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
+                <p id="zipProgressText" class="mt-2 text-center">正在打包视频...</p>
+                <div id="zipProgressDetails" class="mt-2 text-sm text-gray-600">
+                    <p id="currentFile" class="text-center"></p>
+                    <p id="progressStats" class="text-center"></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 添加清空按钮 -->
+        <div class="max-w-6xl mx-auto mb-4">
+            <div class="flex justify-end mb-4">
+                <button onclick="clearAllVideos()" 
+                        class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                    </svg>
+                    清空列表
+                </button>
+            </div>
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                序号
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                视频标题
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                清晰度
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                状态
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                操作
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for video in videos %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ loop.index }}
+                            </td>
+                            <td class="px-6 py-4">
+                                <div class="flex flex-col">
+                                    <div class="text-base text-gray-900 break-words">{{ video.title }}</div>
+                                    <div class="text-sm text-gray-500 mt-1">
+                                        上传者: {{ video.uploader or '未知' }} | 
+                                        时长: {{ video.duration|format_duration if video.duration else '未知' }}
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4">
+                                {% if video.status == 'pending' %}
+                                <select class="format-select px-3 py-1 border rounded" data-video-id="{{ video.id }}">
+                                    {% for format in video.formats %}
+                                    <option value="{{ format.format_id }}"
+                                            {% if video.selected_format and format.format_id == video.selected_format.format_id %}selected{% endif %}>
+                                        {{ format.resolution }} ({{ format.ext }})
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                {% else %}
+                                <span class="text-gray-500">
+                                    {% if video.selected_format %}
+                                        {{ video.selected_format.resolution }} 
+                                        ({{ video.selected_format.ext }})
+                                    {% else %}
+                                        默认质量
+                                    {% endif %}
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4">
+                                {% if video.status == 'pending' %}
+                                <span class="text-yellow-500">待下载</span>
+                                {% elif video.status == 'downloading' %}
+                                <span class="text-blue-500">下载中</span>
+                                {% elif video.status == 'completed' %}
+                                <span class="text-green-500">已完成</span>
+                                {% else %}
+                                <span class="text-red-500">出错</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 text-right whitespace-nowrap">
+                                {% if video.status == 'pending' %}
+                                <button onclick="startDownload('{{ video.id }}')"
+                                        class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                    下载
+                                </button>
+                                {% elif video.status == 'completed' %}
+                                <a href="{{ video.file_path }}" 
+                                   download="{{ video.title }}"
+                                   class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                                    下载文件
+                                </a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 添加模式切换函数
+        function switchMode(mode) {
+            // 隐藏所有模式
+            document.getElementById('singleMode').classList.add('hidden');
+            document.getElementById('batchMode').classList.add('hidden');
+            document.getElementById('channelMode').classList.add('hidden');
+            
+            // 重置按钮样式
+            document.getElementById('singleModeBtn').classList.replace('bg-blue-500', 'bg-gray-500');
+            document.getElementById('batchModeBtn').classList.replace('bg-blue-500', 'bg-gray-500');
+            document.getElementById('channelModeBtn').classList.replace('bg-blue-500', 'bg-gray-500');
+            
+            // 显示选中的模式
+            document.getElementById(`${mode}Mode`).classList.remove('hidden');
+            document.getElementById(`${mode}ModeBtn`).classList.replace('bg-gray-500', 'bg-blue-500');
+        }
+
+        // 修改批量表单提交处理
+        const batchForm = document.getElementById('batchForm');
+        batchForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const progress = document.getElementById('progress');
+            const progressText = document.getElementById('progressText');
+            
+            progress.classList.remove('hidden');
+            progressText.textContent = '正在处理批量下载...';
+            
+            try {
+                const formData = new FormData(batchForm);
+                const urls = formData.get('urls').split('\n').filter(url => url.trim());
+                
+                if (urls.length === 0) {
+                    throw new Error('请输入至少一个视频链接');
+                }
+                
+                const response = await fetch('/video-info', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ urls: urls })
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || '批量处理失败');
+                }
+                
+                const result = await response.json();
+                if (result.success) {
+                    window.location.reload();
+                }
+            } catch (error) {
+                alert('批量处理失败: ' + (error.message || '未知错误'));
+            } finally {
+                progress.classList.add('hidden');
+                batchForm.reset();
+            }
+        });
+
+        // 处理用户视频下载
+        const channelForm = document.getElementById('channelForm');
+        channelForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            progress.classList.remove('hidden');
+            document.getElementById('progressText').textContent = '正在获取用户视频信息...';
+            
+            try {
+                const response = await fetch('/channel-info', {
+                    method: 'POST',
+                    body: new FormData(channelForm)
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || '获取用户视频失败');
+                }
+                
+                const result = await response.json();
+                if (result.success) {
+                    window.location.reload();
+                }
+            } catch (error) {
+                alert('获取用户视频失败: ' + (error.message || '未知错误'));
+            } finally {
+                progress.classList.add('hidden');
+                channelForm.reset();
+            }
+        });
+
+        const form = document.getElementById('downloadForm');
+        const progress = document.getElementById('progress');
+
+        // 处理表单提交
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            progress.classList.remove('hidden');
+            
+            try {
+                // 获取视频信息
+                const response = await fetch('/video-info', {
+                    method: 'POST',
+                    body: new FormData(form)
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || '获取视频信息失败');
+                }
+                
+                const result = await response.json();
+                if (result.success) {
+                    window.location.reload();  // 刷新页面显示新视频信息
+                }
+            } catch (error) {
+                alert('处理失败: ' + (error.message || '未知错误'));
+            } finally {
+                progress.classList.add('hidden');
+                form.reset();
+            }
+        });
+
+        // 处理清晰度选择
+        document.addEventListener('change', async (e) => {
+            if (e.target.classList.contains('format-select')) {
+                const videoId = e.target.dataset.videoId;
+                const formatId = e.target.value;
+                
+                try {
+                    const response = await fetch(`/update-format/${videoId}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ format_id: formatId })
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error('更新清晰度失败');
+                    }
+                } catch (error) {
+                    alert('更新清晰度失败: ' + error.message);
+                }
+            }
+        });
+
+        // 处理下载按钮点击
+        async function startDownload(videoId) {
+            progress.classList.remove('hidden');
+            try {
+                const response = await fetch(`/download/${videoId}`, {
+                    method: 'POST'
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || '下载失败');
+                }
+                
+                const result = await response.json();
+                if (result.success) {
+                    window.location.reload();
+                }
+            } catch (error) {
+                alert('下载失败: ' + (error.message || '未知错误'));
+            } finally {
+                progress.classList.add('hidden');
+            }
+        }
+
+        async function clearAllVideos() {
+            if (!confirm('确定要清空所有视频吗？此操作不可恢复！')) {
+                return;
+            }
+            
+            try {
+                progress.classList.remove('hidden');
+                const response = await fetch('/videos', {
+                    method: 'DELETE'
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || '清空失败');
+                }
+                
+                const result = await response.json();
+                if (result.success) {
+                    window.location.reload();
+                }
+            } catch (error) {
+                alert('清空失败: ' + (error.message || '未知错误'));
+            } finally {
+                progress.classList.add('hidden');
+            }
+        }
+
+        // WebSocket连接
+        const ws = new WebSocket(`ws://${window.location.host}/ws`);
+        
+        ws.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            if (data.type === 'download_status') {
+                const progressText = document.getElementById('progressText');
+                progressText.textContent = `正在下载 ${data.title} (${data.current}/${data.total})`;
+            } else if (data.type === 'zip_progress') {
+                const progressText = document.getElementById('progressText');
+                progressText.textContent = `正在打包 ${data.filename} (${data.current}/${data.total})`;
+            }
+        };
+
+        // 动态添加视频到表格
+        function addVideoToTable(video) {
+            const tbody = document.querySelector('table tbody');
+            const rowCount = tbody.children.length + 1;  // 获取当前行数作为编号
+            
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-gray-50';
+            tr.innerHTML = `
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    ${rowCount}
+                </td>
+                <td class="px-6 py-4">
+                    <div class="flex flex-col">
+                        <div class="text-base text-gray-900 break-words">${video.title}</div>
+                        <div class="text-sm text-gray-500 mt-1">
+                            上传者: ${video.uploader || '未知'} | 
+                            时长: ${formatDuration(video.duration)}
+                        </div>
+                    </div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <select class="form-select text-sm" onchange="updateFormat('${video.id}', this.value)">
+                        ${video.formats.map(format => `
+                            <option value="${format.format_id}" 
+                                ${video.selected_format && format.format_id === video.selected_format.format_id ? 'selected' : ''}>
+                                ${format.resolution} (${format.ext})
+                            </option>
+                        `).join('')}
+                    </select>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="px-2 py-1 text-xs font-semibold text-yellow-500 bg-yellow-50 rounded-full">
+                        待下载
+                    </span>
+                </td>
+                <td class="px-6 py-4 text-right text-sm font-medium">
+                    <button onclick="downloadVideo('${video.id}')"
+                            class="text-blue-500 hover:text-blue-700">
+                        下载
+                    </button>
+                </td>
+            `;
+            
+            tbody.appendChild(tr);
+        }
+
+        // 格式化时长
+        function formatDuration(seconds) {
+            if (!seconds) return '未知';
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            const hours = Math.floor(minutes / 60);
+            const remainingMinutes = minutes % 60;
+            
+            if (hours > 0) {
+                return `${hours}:${String(remainingMinutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
+            }
+            return `${remainingMinutes}:${String(remainingSeconds).padStart(2, '0')}`;
+        }
+
+        // 批量下载函数
+        async function downloadAllVideos() {
+            const zipProgress = document.getElementById('zipProgress');
+            try {
+                zipProgress.classList.remove('hidden');
+                
+                const response = await fetch('/download-all', {
+                    method: 'POST'
+                });
+                
+                if (!response.ok) {
+                    throw new Error('下载失败');
+                }
+                
+                // 获取文件名
+                const contentDisposition = response.headers.get('content-disposition');
+                let filename = 'youtube_videos.zip';
+                if (contentDisposition) {
+                    const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(contentDisposition);
+                    if (matches != null && matches[1]) {
+                        filename = matches[1].replace(/['"]/g, '');
+                    }
+                }
+                
+                // 创建下载链接
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+            } catch (error) {
+                alert('批量下载失败: ' + error.message);
+            } finally {
+                zipProgress.classList.add('hidden');
+            }
+        }
+    </script>
+</body>
+</html> 
